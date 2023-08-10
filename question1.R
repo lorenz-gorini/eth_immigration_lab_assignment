@@ -1,3 +1,5 @@
+rm(list = ls())
+
 library(lubridate)
 library(dplyr)
 library(ggplot2)
@@ -29,7 +31,7 @@ print(paste0(
 # entered or left the country (YM_start and YM_end) for each row of the job
 # dataset
 merge_df <- dem_dat %>%
-  left_join(job_dat, by = "PERS_ID", relationship = "one_to_many")
+  left_join(job_dat, by = "PERS_ID")
 
 # I am assuming that the dataset is consistent, so:
 # 1. YM_start of a job is always before the YM_end of the same job
@@ -58,9 +60,9 @@ merge_df <- merge_df %>%
     YM_in_plus_3_years = pmin(YM_in + years(3), YM_out),
     YM_start_3_years = pmax(YM_in, YM_start),
     YM_end_3_years = pmin(YM_in_plus_3_years, YM_end)
-  ) %>%
-  filter(YM_end_3_years <= YM_in) %>%
-  filter(YM_start_3_years <= YM_out)
+  )
+# filter(YM_end_3_years >= YM_in) %>%
+# filter(YM_start_3_years <= YM_out)
 merge_df <- merge_df %>% mutate(
   months_worked = interval(YM_start_3_years, YM_end_3_years) %>%
     as.period() %>%
@@ -77,8 +79,9 @@ merge_df$months_worked[merge_df$months_worked < 0] <- 0
 total_months_per_pers <- merge_df %>%
   group_by(PERS_ID) %>%
   summarize(total_months = sum(months_worked))
-
-filter(merge_df, PERS_ID == 120243185)
+# Cap the total_months to 36
+total_months_per_pers$total_months[total_months_per_pers$total_months > 36] <-
+  36
 
 # Print the result
 print(paste0(
@@ -111,7 +114,7 @@ ggplot(total_months_per_pers, aes(x = total_months)) +
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank()
   )
-
+ggsave("total_months_per_pers_histogram.png")
 # Plot the violin plot of total_months_per_pers with ggplot2
 ggplot(total_months_per_pers, aes(x = "immigrants", y = total_months)) +
   geom_violin(fill = "lightblue") +
@@ -126,3 +129,10 @@ ggplot(total_months_per_pers, aes(x = "immigrants", y = total_months)) +
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank()
   )
+ggsave(
+  filename = "total_months_per_pers_violin_plot.png",
+  plot = last_plot(),
+  width = 20,
+  height = 40,
+  units = "cm"
+)
